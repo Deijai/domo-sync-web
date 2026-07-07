@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil, Trash2, MonitorPlay } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { DataTable } from "@/components/data-table"
 import { StatusBadge } from "@/components/status-badge"
@@ -156,6 +156,15 @@ export default function HealthUnitsPage() {
             className: "text-right",
             cell: (row) => (
               <div className="flex justify-end gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => window.open(`/painel/${row.id}`, "_blank", "noopener,noreferrer")}
+                  aria-label="Abrir painel"
+                  title="Abrir painel de senhas desta unidade"
+                >
+                  <MonitorPlay className="size-4" />
+                </Button>
                 <PermissionGate permission={PERMISSIONS.HEALTH_UNITS_UPDATE}>
                   <Button variant="ghost" size="icon-sm" onClick={() => openEdit(row)} aria-label="Editar">
                     <Pencil className="size-4" />

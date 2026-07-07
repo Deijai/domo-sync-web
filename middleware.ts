@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const PUBLIC_PATHS = ["/login"]
+const PUBLIC_PATHS = ["/login", "/painel"]
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -12,7 +12,7 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url))
   }
 
-  if (isPublic && token) {
+  if (pathname.startsWith("/login") && token) {
     return NextResponse.redirect(new URL("/dashboard", req.url))
   }
 

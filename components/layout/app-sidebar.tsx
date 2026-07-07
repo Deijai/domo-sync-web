@@ -11,6 +11,7 @@ import {
   BriefcaseMedical,
   Building2,
   Ticket,
+  Volume2,
   BarChart3,
   Settings,
   LogOut,
@@ -47,6 +48,7 @@ const navItems = [
   },
   { label: "Unidades de Saúde", icon: Building2, href: "/health-units", permission: PERMISSIONS.HEALTH_UNITS_READ },
   { label: "Fichas", icon: Ticket, href: "/tickets", permission: PERMISSIONS.TICKETS_READ },
+  { label: "Fila de Atendimento", icon: Volume2, href: "/queue", permission: PERMISSIONS.TICKETS_CALL },
   { label: "Relatórios", icon: BarChart3, href: "/reports", permission: PERMISSIONS.REPORTS_READ },
   { label: "Configurações", icon: Settings, href: "/settings", permission: null },
 ]

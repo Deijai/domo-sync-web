@@ -44,8 +44,10 @@ export const PERMISSIONS = {
   TICKETS_NO_SHOW: "tickets.no-show",
   TICKETS_REOPEN: "tickets.reopen",
   TICKETS_PRINT: "tickets.print",
+  TICKETS_CALL: "tickets.call",
 
   REPORTS_READ: "reports.read",
+  REPORTS_PRINT: "reports.print",
 } as const
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]

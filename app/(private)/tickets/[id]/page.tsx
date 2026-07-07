@@ -45,13 +45,16 @@ const transferSchema = z.object({
   newPatientId: z.string().optional(),
   reason: z.string().optional(),
 })
+const callSchema = z.object({ counterLabel: z.string().min(1, "Informe o guichê") })
+
+const LAST_COUNTER_LABEL_KEY = "dma:last-counter-label"
 
 export default function TicketDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const queryClient = useQueryClient()
 
-  const [dialog, setDialog] = useState<"cancel" | "transfer" | "change-date" | null>(null)
+  const [dialog, setDialog] = useState<"cancel" | "transfer" | "change-date" | "assign" | "call" | null>(null)
   const [confirmAction, setConfirmAction] = useState<"confirm-presence" | "attend" | "no-show" | "reopen" | null>(
     null,
   )
@@ -86,7 +89,7 @@ export default function TicketDetailPage() {
   const patientsQuery = useQuery({
     queryKey: ["patients", "search", patientSearch],
     queryFn: () => patientsApi.list({ search: patientSearch || undefined, pageSize: 20 }),
-    enabled: dialog === "transfer",
+    enabled: dialog === "transfer" || dialog === "assign",
   })
 
   const patientOptions = (patientsQuery.data?.data ?? []).map((p) => ({
@@ -99,6 +102,10 @@ export default function TicketDetailPage() {
   const transferForm = useForm<z.infer<typeof transferSchema>>({
     resolver: zodResolver(transferSchema),
     defaultValues: { newProfessionalId: "", newServiceDate: "", newPatientId: "", reason: "" },
+  })
+  const callForm = useForm<z.infer<typeof callSchema>>({
+    resolver: zodResolver(callSchema),
+    defaultValues: { counterLabel: "" },
   })
 
   function refresh() {
@@ -143,9 +150,11 @@ export default function TicketDetailPage() {
   const canCancel = status === "AVAILABLE" || status === "RESERVED"
   const canTransfer = status === "AVAILABLE" || status === "RESERVED" || status === "CONFIRMED"
   const canChangeDate = canTransfer
+  const canAssign = status === "AVAILABLE"
+  const canCall = status === "CONFIRMED" || status === "CALLED"
   const canConfirmPresence = status === "RESERVED"
-  const canAttend = status === "CONFIRMED"
-  const canNoShow = status === "RESERVED" || status === "CONFIRMED"
+  const canAttend = status === "CONFIRMED" || status === "CALLED"
+  const canNoShow = status === "RESERVED" || status === "CONFIRMED" || status === "CALLED"
   const canReopen = status === "CANCELED"
 
   const confirmActionConfig = {
@@ -196,6 +205,12 @@ export default function TicketDetailPage() {
             <Info label="Data" value={new Date(ticket.serviceDate).toLocaleDateString("pt-BR")} />
             <Info label="Horário" value={ticket.scheduledTime ?? "—"} />
             <Info label="Instrução" value={ticket.arrivalInstruction} className="col-span-2" />
+            {ticket.counterLabel && (
+              <Info
+                label="Guichê"
+                value={`${ticket.counterLabel}${ticket.calledAt ? ` · ${new Date(ticket.calledAt).toLocaleTimeString("pt-BR")}` : ""}`}
+              />
+            )}
             {ticket.canceledReason && (
               <Info label="Motivo do cancelamento" value={ticket.canceledReason} className="col-span-2" />
             )}
@@ -219,10 +234,37 @@ export default function TicketDetailPage() {
                 <Printer className="mr-2 size-4" /> Imprimir ficha
               </Button>
             </PermissionGate>
+            <PermissionGate permission={PERMISSIONS.TICKETS_RESERVE}>
+              {canAssign && (
+                <Button
+                  onClick={() => {
+                    setPatientSearch("")
+                    setSelectedPatient(null)
+                    setDialog("assign")
+                  }}
+                >
+                  Marcar consulta
+                </Button>
+              )}
+            </PermissionGate>
             <PermissionGate permission={PERMISSIONS.TICKETS_CONFIRM_PRESENCE}>
               {canConfirmPresence && (
                 <Button variant="outline" onClick={() => setConfirmAction("confirm-presence")}>
                   Confirmar presença
+                </Button>
+              )}
+            </PermissionGate>
+            <PermissionGate permission={PERMISSIONS.TICKETS_CALL}>
+              {canCall && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const lastLabel = typeof window !== "undefined" ? localStorage.getItem(LAST_COUNTER_LABEL_KEY) : null
+                    callForm.reset({ counterLabel: lastLabel ?? "" })
+                    setDialog("call")
+                  }}
+                >
+                  {status === "CALLED" ? "Chamar novamente" : "Chamar"}
                 </Button>
               )}
             </PermissionGate>
@@ -290,9 +332,14 @@ export default function TicketDetailPage() {
                 </Button>
               )}
             </PermissionGate>
-            {!canCancel && !canTransfer && !canConfirmPresence && !canAttend && !canNoShow && !canReopen && (
-              <p className="text-sm text-muted-foreground">Nenhuma ação disponível para este status.</p>
-            )}
+            {!canCancel &&
+              !canTransfer &&
+              !canAssign &&
+              !canCall &&
+              !canConfirmPresence &&
+              !canAttend &&
+              !canNoShow &&
+              !canReopen && <p className="text-sm text-muted-foreground">Nenhuma ação disponível para este status.</p>}
           </CardContent>
         </Card>
       </div>
@@ -406,6 +453,105 @@ export default function TicketDetailPage() {
               )}
             >
               Salvar nova data
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Marcar consulta */}
+      <Dialog open={dialog === "assign"} onOpenChange={(open) => !open && setDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Marcar consulta</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 px-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="assignPatientId">Paciente</Label>
+              <Combobox<{ value: string; label: string }>
+                items={patientOptions}
+                filter={null}
+                inputValue={patientSearch}
+                onInputValueChange={setPatientSearch}
+                value={selectedPatient}
+                onValueChange={setSelectedPatient}
+              >
+                <ComboboxInputGroup>
+                  <ComboboxInput id="assignPatientId" placeholder="Buscar paciente por nome ou CPF..." />
+                </ComboboxInputGroup>
+                <ComboboxPopup>
+                  <ComboboxEmpty>
+                    {patientsQuery.isLoading
+                      ? "Buscando..."
+                      : patientsQuery.isError
+                        ? patientsQuery.error instanceof ApiError && patientsQuery.error.statusCode === 403
+                          ? "Você não tem permissão para buscar pacientes."
+                          : "Erro ao buscar pacientes."
+                        : "Nenhum paciente encontrado."}
+                  </ComboboxEmpty>
+                  <ComboboxList>
+                    {(item) => (
+                      <ComboboxItem key={item.value} value={item}>
+                        {item.label}
+                      </ComboboxItem>
+                    )}
+                  </ComboboxList>
+                </ComboboxPopup>
+              </Combobox>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              disabled={actionLoading || !selectedPatient}
+              onClick={() => {
+                if (!selectedPatient) {
+                  toast.error("Selecione um paciente")
+                  return
+                }
+                runAction(() => ticketsApi.assign(ticket.id, selectedPatient.value), "Consulta marcada")
+              }}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Chamar */}
+      <Dialog open={dialog === "call"} onOpenChange={(open) => !open && setDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Chamar ficha</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={callForm.handleSubmit((data) =>
+              runAction(() => ticketsApi.call(ticket.id, data.counterLabel), "Ficha chamada", () => {
+                if (typeof window !== "undefined") {
+                  localStorage.setItem(LAST_COUNTER_LABEL_KEY, data.counterLabel)
+                }
+              }),
+            )}
+            className="space-y-3 px-4"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="counterLabel">Guichê</Label>
+              <Input id="counterLabel" placeholder="0001" {...callForm.register("counterLabel")} />
+              {callForm.formState.errors.counterLabel && (
+                <p className="text-xs text-destructive">{callForm.formState.errors.counterLabel.message}</p>
+              )}
+            </div>
+          </form>
+          <DialogFooter>
+            <Button
+              disabled={actionLoading}
+              onClick={callForm.handleSubmit((data) =>
+                runAction(() => ticketsApi.call(ticket.id, data.counterLabel), "Ficha chamada", () => {
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem(LAST_COUNTER_LABEL_KEY, data.counterLabel)
+                  }
+                }),
+              )}
+            >
+              Confirmar
             </Button>
           </DialogFooter>
         </DialogContent>

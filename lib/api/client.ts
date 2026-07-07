@@ -1,7 +1,7 @@
 import { useAuthStore } from "@/stores/auth.store"
 import { decodeJwtPayload } from "@/lib/jwt"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333"
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333"
 
 function readAuthStorage(): { accessToken: string | null; refreshToken: string | null } {
   if (typeof window === "undefined") return { accessToken: null, refreshToken: null }

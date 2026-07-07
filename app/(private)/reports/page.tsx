@@ -3,18 +3,24 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { toast } from "sonner"
 import { PageHeader } from "@/components/page-header"
 import { StatCard } from "@/components/stat-card"
 import { LoadingState } from "@/components/feedback-states"
+import { PermissionGate } from "@/components/permission-gate"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Ticket, CheckCircle2, UserX, TrendingUp } from "lucide-react"
-import { reportsApi } from "@/lib/api/reports"
+import { Ticket, CheckCircle2, UserX, TrendingUp, FileDown } from "lucide-react"
+import { reportsApi, type ReportsFilters } from "@/lib/api/reports"
 import { specialtiesApi } from "@/lib/api/specialties"
 import { professionalsApi } from "@/lib/api/professionals"
 import { healthUnitsApi } from "@/lib/api/health-units"
+import { ApiError } from "@/lib/api/client"
+import { openPdfBlob } from "@/lib/open-pdf"
+import { PERMISSIONS } from "@/lib/permissions"
 
 const NONE = "__all__"
 
@@ -24,6 +30,7 @@ export default function ReportsPage() {
   const [specialtyId, setSpecialtyId] = useState(NONE)
   const [professionalId, setProfessionalId] = useState(NONE)
   const [healthUnitId, setHealthUnitId] = useState(NONE)
+  const [printingReport, setPrintingReport] = useState<string | null>(null)
 
   const filters = {
     startDate: startDate || undefined,
@@ -70,6 +77,25 @@ export default function ReportsPage() {
     queryKey: ["reports", "by-patient", filters],
     queryFn: () => reportsApi.ticketsByPatient(filters),
   })
+
+  const managementReports = [
+    { key: "attendance", label: "Atendimento vs Falta", print: reportsApi.printAttendance },
+    { key: "productivity", label: "Produtividade por Profissional", print: reportsApi.printProductivity },
+    { key: "volume", label: "Volume por Especialidade e Unidade", print: reportsApi.printVolume },
+    { key: "queue", label: "Fila e Tempo de Chamada", print: reportsApi.printQueue },
+  ]
+
+  async function handlePrintReport(key: string, print: (filters: ReportsFilters) => Promise<Blob>) {
+    setPrintingReport(key)
+    try {
+      const blob = await print(filters)
+      openPdfBlob(blob)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Erro ao gerar relatório em PDF")
+    } finally {
+      setPrintingReport(null)
+    }
+  }
 
   return (
     <div>
@@ -135,6 +161,27 @@ export default function ReportsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <PermissionGate permission={PERMISSIONS.REPORTS_PRINT}>
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-base">Relatórios Gerenciais (PDF)</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {managementReports.map((report) => (
+              <Button
+                key={report.key}
+                variant="outline"
+                disabled={printingReport === report.key}
+                onClick={() => handlePrintReport(report.key, report.print)}
+              >
+                <FileDown className="mr-2 size-4" />
+                {printingReport === report.key ? "Gerando..." : report.label}
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      </PermissionGate>
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard title="Total de fichas" value={summaryQuery.data?.total ?? 0} icon={Ticket} />

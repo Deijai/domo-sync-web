@@ -66,4 +66,6 @@ export const ticketsApi = {
   attend: (id: string) => api.post<Ticket>(`/tickets/${id}/attend`, {}),
   noShow: (id: string) => api.post<Ticket>(`/tickets/${id}/no-show`, {}),
   reopen: (id: string) => api.post<Ticket>(`/tickets/${id}/reopen`, {}),
+  assign: (id: string, patientId: string) => api.post<Ticket>(`/tickets/${id}/assign`, { patientId }),
+  call: (id: string, counterLabel: string) => api.post<Ticket>(`/tickets/${id}/call`, { counterLabel }),
 }

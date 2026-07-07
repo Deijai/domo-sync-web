@@ -6,6 +6,7 @@ export type TicketStatus =
   | "AVAILABLE"
   | "RESERVED"
   | "CONFIRMED"
+  | "CALLED"
   | "ATTENDED"
   | "CANCELED"
   | "NO_SHOW"
@@ -177,12 +178,36 @@ export interface Ticket {
   status: TicketStatus
   reservedAt: string | null
   confirmedAt: string | null
+  calledAt: string | null
+  counterLabel: string | null
   attendedAt: string | null
   canceledAt: string | null
   canceledReason: string | null
   transferredAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface QueueTicket extends Ticket {
+  queuePosition?: number | null
+}
+
+export interface TicketQueueState {
+  waiting: Ticket[]
+  calledNow: Ticket[]
+  recentCalls: Ticket[]
+}
+
+export interface PublicQueueCall {
+  ticketNumber: string
+  counterLabel: string | null
+  calledAt: string | null
+}
+
+export interface PublicQueuePanel {
+  healthUnit: { id: string; name: string }
+  current: PublicQueueCall | null
+  lastCalls: PublicQueueCall[]
 }
 
 export interface TicketMovement {

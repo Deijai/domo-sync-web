@@ -36,4 +36,9 @@ export const reportsApi = {
     ),
   attendanceRate: (filters: ReportsFilters = {}) =>
     api.get<AttendanceRate>(`/reports/attendance-rate${toQuery(filters)}`),
+
+  printAttendance: (filters: ReportsFilters = {}) => api.getBlob(`/reports/attendance/print${toQuery(filters)}`),
+  printProductivity: (filters: ReportsFilters = {}) => api.getBlob(`/reports/productivity/print${toQuery(filters)}`),
+  printVolume: (filters: ReportsFilters = {}) => api.getBlob(`/reports/volume/print${toQuery(filters)}`),
+  printQueue: (filters: ReportsFilters = {}) => api.getBlob(`/reports/queue/print${toQuery(filters)}`),
 }
