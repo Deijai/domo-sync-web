@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil, Trash2, KeyRound } from "lucide-react"
 import { toast } from "sonner"
 import { PageHeader } from "@/components/page-header"
 import { DataTable } from "@/components/data-table"
@@ -21,7 +21,9 @@ import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from "@/com
 import { ApiError } from "@/lib/api/client"
 import { professionalsApi } from "@/lib/api/professionals"
 import { specialtiesApi } from "@/lib/api/specialties"
-import { SIMPLE_STATUS_COLOR, SIMPLE_STATUS_LABEL } from "@/lib/status-labels"
+import { usersApi } from "@/lib/api/users"
+import { rolesApi } from "@/lib/api/roles"
+import { ACCOUNT_STATUS_COLOR, ACCOUNT_STATUS_LABEL, SIMPLE_STATUS_COLOR, SIMPLE_STATUS_LABEL } from "@/lib/status-labels"
 import { PERMISSIONS } from "@/lib/permissions"
 import { cn } from "@/lib/utils"
 import type { Professional, SimpleStatus } from "@/types/api"
@@ -49,6 +51,10 @@ export default function ProfessionalsPage() {
   const [deleting, setDeleting] = useState<Professional | null>(null)
   const [saving, setSaving] = useState(false)
   const [selectedSpecialtyIds, setSelectedSpecialtyIds] = useState<Set<string>>(new Set())
+  const [accessEmail, setAccessEmail] = useState("")
+  const [accessPassword, setAccessPassword] = useState("")
+  const [accessRoleId, setAccessRoleId] = useState("")
+  const [creatingAccess, setCreatingAccess] = useState(false)
 
   const query = useQuery({
     queryKey: ["professionals", { page, search }],
@@ -60,6 +66,27 @@ export default function ProfessionalsPage() {
     queryFn: () => specialtiesApi.list({ pageSize: 100 }),
   })
 
+  const rolesQuery = useQuery({
+    queryKey: ["roles", "all"],
+    queryFn: () => rolesApi.list({ pageSize: 100 }),
+    enabled: sheetOpen && !!editing && !editing.user,
+  })
+
+  useEffect(() => {
+    if (!rolesQuery.data || accessRoleId) return
+    const preferred = rolesQuery.data.data.find((r) => r.name === "PROFISSIONAL")
+    if (preferred) setAccessRoleId(preferred.id)
+  }, [rolesQuery.data, accessRoleId])
+
+  // Sugere o e-mail de contato já preenchido como e-mail de acesso, pra não parecerem
+  // dois cadastros desconectados — o usuário ainda pode trocar por outro.
+  useEffect(() => {
+    if (editing && !editing.user && !accessEmail && editing.email) {
+      setAccessEmail(editing.email)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing])
+
   const {
     register,
     handleSubmit,
@@ -69,10 +96,17 @@ export default function ProfessionalsPage() {
     formState: { errors },
   } = useForm<FormData>({ resolver: zodResolver(formSchema), defaultValues: emptyForm })
 
+  function resetAccessForm() {
+    setAccessEmail("")
+    setAccessPassword("")
+    setAccessRoleId("")
+  }
+
   function openCreate() {
     setEditing(null)
     reset(emptyForm)
     setSelectedSpecialtyIds(new Set())
+    resetAccessForm()
     setSheetOpen(true)
   }
 
@@ -89,7 +123,34 @@ export default function ProfessionalsPage() {
       status: professional.status,
     })
     setSelectedSpecialtyIds(new Set(professional.specialties.map((s) => s.id)))
+    resetAccessForm()
     setSheetOpen(true)
+  }
+
+  async function handleCreateAccess() {
+    if (!editing) return
+    if (!accessEmail || !accessPassword || !accessRoleId) {
+      toast.error("Preencha e-mail, senha e perfil")
+      return
+    }
+    setCreatingAccess(true)
+    try {
+      await usersApi.create({
+        name: editing.fullName,
+        email: accessEmail,
+        password: accessPassword,
+        roleId: accessRoleId,
+        professionalId: editing.id,
+      })
+      toast.success("Acesso criado")
+      const refreshed = await professionalsApi.get(editing.id)
+      setEditing(refreshed)
+      queryClient.invalidateQueries({ queryKey: ["professionals"] })
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Erro ao criar acesso")
+    } finally {
+      setCreatingAccess(false)
+    }
   }
 
   function toggleSpecialty(id: string) {
@@ -103,15 +164,22 @@ export default function ProfessionalsPage() {
 
   async function onSubmit(data: FormData) {
     setSaving(true)
+    const wasCreating = !editing
     try {
       const payload = { ...data, email: data.email || undefined }
-      const professional = editing
+      const created = editing
         ? await professionalsApi.update(editing.id, payload)
         : await professionalsApi.create(payload)
-      await professionalsApi.setSpecialties(professional.id, Array.from(selectedSpecialtyIds))
+      const professional = await professionalsApi.setSpecialties(created.id, Array.from(selectedSpecialtyIds))
       toast.success(editing ? "Profissional atualizado" : "Profissional criado")
       queryClient.invalidateQueries({ queryKey: ["professionals"] })
-      setSheetOpen(false)
+      if (wasCreating) {
+        // Continua na mesma sheet (agora em modo edição) pra já poder criar o acesso ao sistema,
+        // sem precisar fechar e reabrir editando o profissional recém-criado.
+        setEditing(professional)
+      } else {
+        setSheetOpen(false)
+      }
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Erro ao salvar profissional")
     } finally {
@@ -262,9 +330,12 @@ export default function ProfessionalsPage() {
                 </Select>
               </div>
               <div className="col-span-2 space-y-1.5">
-                <Label htmlFor="email">E-mail</Label>
+                <Label htmlFor="email">E-mail de contato</Label>
                 <Input id="email" type="email" {...register("email")} />
                 {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+                <p className="text-xs text-muted-foreground">
+                  Só pra contato — não é usado pra login. O login fica em "Acesso ao sistema", mais abaixo.
+                </p>
               </div>
             </div>
 
@@ -291,6 +362,89 @@ export default function ProfessionalsPage() {
                 })}
               </div>
             </div>
+
+            {editing && (
+              <PermissionGate permission={PERMISSIONS.USERS_CREATE}>
+                <div className="space-y-3 border-t pt-3">
+                  <div className="flex items-center gap-1.5">
+                    <KeyRound className="size-4 text-muted-foreground" />
+                    <Label className="text-sm font-medium">Acesso ao sistema</Label>
+                  </div>
+
+                  {editing.user ? (
+                    <div className="flex items-center justify-between rounded-md border p-3 text-sm">
+                      <div>
+                        <p className="font-medium">{editing.user.email}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Este profissional já pode logar no sistema com este e-mail.
+                        </p>
+                      </div>
+                      <StatusBadge
+                        label={ACCOUNT_STATUS_LABEL[editing.user.status]}
+                        className={ACCOUNT_STATUS_COLOR[editing.user.status]}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2 rounded-md border p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Crie um login para este profissional acessar a Fila de Atendimento e ver só as próprias
+                        fichas. Pode usar o mesmo e-mail de contato preenchido acima ou outro — é só o que ele vai
+                        digitar pra entrar no sistema.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="col-span-2 space-y-1.5">
+                          <Label htmlFor="accessEmail">E-mail de login</Label>
+                          <Input
+                            id="accessEmail"
+                            type="email"
+                            value={accessEmail}
+                            onChange={(e) => setAccessEmail(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="accessPassword">Senha</Label>
+                          <Input
+                            id="accessPassword"
+                            type="password"
+                            value={accessPassword}
+                            onChange={(e) => setAccessPassword(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Perfil</Label>
+                          <Select value={accessRoleId} onValueChange={(v) => v && setAccessRoleId(v)}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Selecione">
+                                {(value: string | null) =>
+                                  rolesQuery.data?.data.find((r) => r.id === value)?.name ?? "Selecione"
+                                }
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {rolesQuery.data?.data.map((role) => (
+                                <SelectItem key={role.id} value={role.id}>
+                                  {role.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        disabled={creatingAccess}
+                        onClick={handleCreateAccess}
+                      >
+                        Criar acesso
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </PermissionGate>
+            )}
           </form>
           <SheetFooter>
             <Button onClick={handleSubmit(onSubmit)} disabled={saving}>

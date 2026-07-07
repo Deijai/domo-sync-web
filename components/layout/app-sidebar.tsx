@@ -48,7 +48,12 @@ const navItems = [
   },
   { label: "Unidades de Saúde", icon: Building2, href: "/health-units", permission: PERMISSIONS.HEALTH_UNITS_READ },
   { label: "Fichas", icon: Ticket, href: "/tickets", permission: PERMISSIONS.TICKETS_READ },
-  { label: "Fila de Atendimento", icon: Volume2, href: "/queue", permission: PERMISSIONS.TICKETS_CALL },
+  {
+    label: "Fila de Atendimento",
+    icon: Volume2,
+    href: "/queue",
+    permission: [PERMISSIONS.TICKETS_CALL, PERMISSIONS.TICKETS_ATTEND],
+  },
   { label: "Relatórios", icon: BarChart3, href: "/reports", permission: PERMISSIONS.REPORTS_READ },
   { label: "Configurações", icon: Settings, href: "/settings", permission: null },
 ]
@@ -67,7 +72,11 @@ export function AppSidebar() {
         .toUpperCase()
     : "AD"
 
-  const visibleItems = navItems.filter((item) => !item.permission || permissions.includes(item.permission))
+  const visibleItems = navItems.filter((item) => {
+    if (!item.permission) return true
+    const required = Array.isArray(item.permission) ? item.permission : [item.permission]
+    return required.some((permission) => permissions.includes(permission))
+  })
 
   return (
     <Sidebar>

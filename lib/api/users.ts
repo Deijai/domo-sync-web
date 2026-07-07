@@ -16,6 +16,7 @@ export interface UserPayload {
   password?: string
   roleId: string
   status?: AccountStatus
+  professionalId?: string
 }
 
 export const usersApi = {

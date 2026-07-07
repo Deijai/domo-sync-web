@@ -32,12 +32,19 @@ export interface RoleSummary {
   name: string
 }
 
+export interface ProfessionalSummary {
+  id: string
+  fullName: string
+}
+
 export interface User {
   id: string
   name: string
   email: string
   status: AccountStatus
   role: RoleSummary
+  professionalId?: string | null
+  professional?: ProfessionalSummary | null
   createdAt: string
   updatedAt: string
 }
@@ -99,6 +106,12 @@ export interface SpecialtySummary {
   name: string
 }
 
+export interface ProfessionalLinkedUser {
+  id: string
+  email: string
+  status: AccountStatus
+}
+
 export interface Professional {
   id: string
   fullName: string
@@ -110,6 +123,7 @@ export interface Professional {
   email: string | null
   status: SimpleStatus
   specialties: SpecialtySummary[]
+  user: ProfessionalLinkedUser | null
   createdAt: string
   updatedAt: string
 }

@@ -6,9 +6,11 @@ import { Ticket, CircleDot, CalendarCheck, XCircle, UserX, CheckCircle2 } from "
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatCard } from "@/components/stat-card"
 import { PageHeader } from "@/components/page-header"
-import { LoadingState, ErrorState } from "@/components/feedback-states"
+import { LoadingState, ErrorState, EmptyState } from "@/components/feedback-states"
 import { reportsApi } from "@/lib/api/reports"
 import { TICKET_STATUS_LABEL } from "@/lib/status-labels"
+import { PERMISSIONS } from "@/lib/permissions"
+import { useAuthStore } from "@/stores/auth.store"
 import type { TicketStatus } from "@/types/api"
 
 function todayIso() {
@@ -17,16 +19,31 @@ function todayIso() {
 
 export default function DashboardPage() {
   const today = todayIso()
+  const canViewReports = useAuthStore((state) => state.permissions.includes(PERMISSIONS.REPORTS_READ))
 
   const summaryQuery = useQuery({
     queryKey: ["reports", "summary", "today", today],
     queryFn: () => reportsApi.summary({ startDate: today, endDate: today }),
+    enabled: canViewReports,
   })
 
   const specialtyQuery = useQuery({
     queryKey: ["reports", "tickets-by-specialty"],
     queryFn: () => reportsApi.ticketsBySpecialty(),
+    enabled: canViewReports,
   })
+
+  if (!canViewReports) {
+    return (
+      <div>
+        <PageHeader title="Dashboard" description="Visão geral das fichas de hoje." />
+        <EmptyState
+          title="Sem indicadores pra mostrar aqui"
+          description='Use "Fila de Atendimento" no menu lateral pra ver suas fichas.'
+        />
+      </div>
+    )
+  }
 
   if (summaryQuery.isLoading) return <LoadingState label="Carregando dashboard..." />
   if (summaryQuery.isError || !summaryQuery.data) {

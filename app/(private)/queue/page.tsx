@@ -19,6 +19,7 @@ import { queueApi, QUEUE_SOCKET_URL } from "@/lib/api/queue"
 import { ticketsApi } from "@/lib/api/tickets"
 import { PERMISSIONS } from "@/lib/permissions"
 import { formatTicketSenha } from "@/lib/status-labels"
+import { useAuthStore } from "@/stores/auth.store"
 import type { Ticket } from "@/types/api"
 
 const LAST_COUNTER_LABEL_KEY = "dma:last-counter-label"
@@ -29,6 +30,7 @@ function batchLabel(ticket: Ticket) {
 
 export default function QueuePage() {
   const queryClient = useQueryClient()
+  const professional = useAuthStore((state) => state.user?.professional)
   const [healthUnitId, setHealthUnitId] = useState("")
   const [counterLabel, setCounterLabel] = useState("")
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -148,8 +150,12 @@ export default function QueuePage() {
   return (
     <div>
       <PageHeader
-        title="Fila de Atendimento"
-        description="Chame a próxima ficha confirmada para o seu guichê."
+        title={professional ? "Meus Atendimentos" : "Fila de Atendimento"}
+        description={
+          professional
+            ? `Fichas de ${professional.fullName} aguardando ou em atendimento.`
+            : "Chame a próxima ficha confirmada para o seu guichê."
+        }
         actions={
           <div className="flex items-center gap-2">
             <Select value={healthUnitId} onValueChange={(v) => v && setHealthUnitId(v)}>
