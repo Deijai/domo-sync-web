@@ -16,6 +16,7 @@ import { specialtiesApi } from "@/lib/api/specialties"
 import { professionalsApi } from "@/lib/api/professionals"
 import { healthUnitsApi } from "@/lib/api/health-units"
 import {
+  formatTicketSenha,
   TICKET_BATCH_STATUS_COLOR,
   TICKET_BATCH_STATUS_LABEL,
   TICKET_STATUS_COLOR,
@@ -160,7 +161,7 @@ export default function TicketsPage() {
             totalPages={ticketsQuery.data?.meta.totalPages ?? 1}
             onPageChange={setPage}
             columns={[
-              { key: "ticketNumber", header: "Nº", cell: (row) => `#${row.ticketNumber}` },
+              { key: "ticketNumber", header: "Senha", cell: (row) => formatTicketSenha(row) },
               { key: "specialty", header: "Especialidade", cell: (row) => row.specialty?.name ?? "—" },
               { key: "professional", header: "Profissional", cell: (row) => row.professional?.fullName ?? "—" },
               { key: "patient", header: "Paciente", cell: (row) => row.patient?.fullName ?? "—" },

@@ -202,6 +202,8 @@ export interface PublicQueueCall {
   ticketNumber: string
   counterLabel: string | null
   calledAt: string | null
+  professionalName: string
+  batchLabel: string | null
 }
 
 export interface PublicQueuePanel {

@@ -50,16 +50,17 @@ export default function QueuePanelPage() {
   useEffect(() => {
     const socket = io(QUEUE_SOCKET_URL, { query: { healthUnitId }, transports: ["websocket"] })
 
-    socket.on("ticket.called", (payload: { ticketNumber: string; counterLabel: string; calledAt: string }) => {
+    socket.on("ticket.called", (payload: PublicQueueCall) => {
       setCurrent((prevCurrent) => {
         if (prevCurrent) {
           setLastCalls((prev) => [prevCurrent, ...prev].slice(0, 10))
         }
-        return { ticketNumber: payload.ticketNumber, counterLabel: payload.counterLabel, calledAt: payload.calledAt }
+        return payload
       })
 
       if (audioEnabledRef.current) {
-        speak(`Senha ${spellTicket(payload.ticketNumber)}, guichê ${payload.counterLabel}`)
+        const label = payload.batchLabel ?? payload.professionalName
+        speak(`Senha ${spellTicket(payload.ticketNumber)}, ${label}, guichê ${payload.counterLabel}`)
       }
     })
 
@@ -93,6 +94,11 @@ export default function QueuePanelPage() {
           <div>
             <p className="text-2xl font-bold sm:text-3xl">SENHA</p>
             <p className="text-[18vw] font-black leading-none sm:text-[10rem]">{current?.ticketNumber ?? "—"}</p>
+            {current && (
+              <p className="mt-1 text-lg font-semibold sm:text-2xl">
+                {current.batchLabel ?? current.professionalName}
+              </p>
+            )}
           </div>
           <div>
             <p className="text-2xl font-bold sm:text-3xl">GUICHÊ</p>
@@ -102,14 +108,19 @@ export default function QueuePanelPage() {
 
         <div className="rounded-md border-2 border-blue-600 p-4">
           <h2 className="mb-3 text-lg font-bold text-blue-600 sm:text-xl">ÚLTIMAS CHAMADAS</h2>
-          <div className="grid grid-cols-2 gap-2 text-sm font-semibold text-blue-600 sm:text-base">
+          <div className="grid grid-cols-[1fr_2fr_1fr] gap-2 text-sm font-semibold text-blue-600 sm:text-base">
             <span>SENHA</span>
+            <span>LOTE</span>
             <span>GUICHÊ</span>
           </div>
           <div className="mt-2 space-y-2">
             {lastCalls.map((call, index) => (
-              <div key={`${call.ticketNumber}-${index}`} className="grid grid-cols-2 gap-2 text-blue-700">
+              <div
+                key={`${call.ticketNumber}-${index}`}
+                className="grid grid-cols-[1fr_2fr_1fr] gap-2 text-sm text-blue-700"
+              >
                 <span>{call.ticketNumber}</span>
+                <span className="truncate">{call.batchLabel ?? call.professionalName}</span>
                 <span>- {call.counterLabel}</span>
               </div>
             ))}

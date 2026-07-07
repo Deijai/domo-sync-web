@@ -64,3 +64,13 @@ export const GENDER_LABEL: Record<string, string> = {
   OTHER: "Outro",
   NOT_INFORMED: "Não informado",
 }
+
+/**
+ * Mesma senha exibida no painel público, na fila de atendimento e no app do
+ * paciente (código da especialidade + número da ficha, ex.: DERM003) — não é
+ * o número cru da ficha, que sozinho reinicia a cada lote e pode se repetir.
+ */
+export function formatTicketSenha(ticket: { ticketNumber: number; specialty?: { code?: string } | null }): string {
+  const code = ticket.specialty?.code ?? ""
+  return `${code}${String(ticket.ticketNumber).padStart(3, "0")}`
+}

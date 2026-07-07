@@ -9,6 +9,7 @@ import { LoadingState, ErrorState } from "@/components/feedback-states"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ticketsApi } from "@/lib/api/tickets"
 import {
+  formatTicketSenha,
   TICKET_BATCH_STATUS_COLOR,
   TICKET_BATCH_STATUS_LABEL,
   TICKET_STATUS_COLOR,
@@ -93,7 +94,7 @@ export default function TicketBatchDetailPage() {
                       "flex aspect-square items-center justify-center rounded-md text-sm font-semibold transition-transform hover:scale-105",
                       TICKET_STATUS_COLOR[ticket.status],
                     )}
-                    title={`Ficha #${ticket.ticketNumber} — ${TICKET_STATUS_LABEL[ticket.status]}`}
+                    title={`Senha ${formatTicketSenha(ticket)} — ${TICKET_STATUS_LABEL[ticket.status]}`}
                   >
                     {ticket.ticketNumber}
                   </Link>

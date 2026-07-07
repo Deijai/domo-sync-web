@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
-import { ArrowLeft, Printer } from "lucide-react"
+import { ArrowLeft, Printer, Info as InfoIcon } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/status-badge"
 import { ConfirmDialog } from "@/components/confirm-dialog"
@@ -33,7 +33,7 @@ import { ApiError } from "@/lib/api/client"
 import { ticketsApi } from "@/lib/api/tickets"
 import { professionalsApi } from "@/lib/api/professionals"
 import { patientsApi } from "@/lib/api/patients"
-import { TICKET_STATUS_COLOR, TICKET_STATUS_LABEL } from "@/lib/status-labels"
+import { formatTicketSenha, TICKET_STATUS_COLOR, TICKET_STATUS_LABEL } from "@/lib/status-labels"
 import { PERMISSIONS } from "@/lib/permissions"
 import { openPdfBlob } from "@/lib/open-pdf"
 
@@ -157,10 +157,20 @@ export default function TicketDetailPage() {
   const canNoShow = status === "RESERVED" || status === "CONFIRMED" || status === "CALLED"
   const canReopen = status === "CANCELED"
 
+  const nextStepMessage: Partial<Record<typeof status, string>> = {
+    AVAILABLE:
+      'Ficha disponível. Se o paciente estiver na unidade agora, clique em "Marcar consulta" para vinculá-lo a esta ficha.',
+    RESERVED:
+      'Ficha reservada para o paciente. Quando ele chegar fisicamente à unidade, clique em "Paciente chegou" — isso coloca a ficha na fila de atendimento.',
+    CONFIRMED:
+      'Paciente já chegou e está aguardando na fila. Chame-o pela tela "Fila de Atendimento" (menu lateral) ou pelo botão "Chamar" ao lado.',
+    CALLED: `Paciente foi chamado para o guichê ${ticket.counterLabel ?? "—"}. Marque "Atender" quando o atendimento acontecer, ou "Faltou" se ele não aparecer.`,
+  }
+
   const confirmActionConfig = {
     "confirm-presence": {
-      title: "Confirmar presença",
-      description: "Confirmar que o paciente compareceu para esta ficha?",
+      title: "Paciente chegou",
+      description: "Confirmar que o paciente chegou à unidade e colocá-lo na fila de atendimento?",
       run: () => runAction(() => ticketsApi.confirmPresence(ticket.id), "Presença confirmada"),
     },
     attend: {
@@ -187,10 +197,17 @@ export default function TicketDetailPage() {
       </Button>
 
       <PageHeader
-        title={`Ficha #${ticket.ticketNumber}`}
+        title={`Senha ${formatTicketSenha(ticket)}`}
         description={ticket.specialty?.name}
         actions={<StatusBadge label={TICKET_STATUS_LABEL[status]} className={TICKET_STATUS_COLOR[status]} />}
       />
+
+      {nextStepMessage[status] && (
+        <div className="mb-4 flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm">
+          <InfoIcon className="mt-0.5 size-4 shrink-0 text-primary" />
+          <p>{nextStepMessage[status]}</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
@@ -250,7 +267,7 @@ export default function TicketDetailPage() {
             <PermissionGate permission={PERMISSIONS.TICKETS_CONFIRM_PRESENCE}>
               {canConfirmPresence && (
                 <Button variant="outline" onClick={() => setConfirmAction("confirm-presence")}>
-                  Confirmar presença
+                  Paciente chegou
                 </Button>
               )}
             </PermissionGate>
